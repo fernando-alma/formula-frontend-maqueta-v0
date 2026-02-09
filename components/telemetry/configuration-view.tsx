@@ -1,6 +1,7 @@
 "use client"
 
-import { HardDriveDownload, CircleDot } from "lucide-react"
+import { useState, useCallback, useRef } from "react"
+import { HardDriveDownload, CircleDot, Loader2, AlertCircle, FileCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,12 +12,69 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useTelemetryContext } from "@/context/TelemetryContext"
 
 interface ConfigurationViewProps {
-  onInitialize: () => void
+  onInitialize: (sessionId: string) => void
 }
 
 export function ConfigurationView({ onInitialize }: ConfigurationViewProps) {
+  const { uploadFile, loading, error, clearError } = useTelemetryContext()
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    clearError()
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      const file = files[0]
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (ext === 'ibt' || ext === 'ld') {
+        setSelectedFile(file)
+      } else {
+        alert('Please upload a .ibt or .ld file')
+      }
+    }
+  }, [clearError])
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    clearError()
+    const files = e.target.files
+    if (files && files.length > 0) {
+      setSelectedFile(files[0])
+    }
+  }, [clearError])
+
+  const handleDropZoneClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleInitialize = useCallback(async () => {
+    if (!selectedFile) {
+      alert('Please select a file first')
+      return
+    }
+
+    const session = await uploadFile(selectedFile)
+    if (session) {
+      onInitialize(session.session_id)
+    }
+  }, [selectedFile, uploadFile, onInitialize])
+
   return (
     <div className="min-h-screen bg-[#09090b] flex items-center justify-center p-8">
       <div className="w-full max-w-2xl">
@@ -47,15 +105,66 @@ export function ConfigurationView({ onInitialize }: ConfigurationViewProps) {
 
           {/* Content */}
           <div className="p-6 space-y-6">
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <p className="text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
             {/* Drop Zone */}
-            <div className="border-2 border-dashed border-zinc-700 rounded-lg p-12 text-center hover:border-cyan-400/50 hover:bg-cyan-400/5 transition-colors cursor-pointer group">
-              <HardDriveDownload className="w-12 h-12 text-zinc-600 mx-auto mb-4 group-hover:text-cyan-400 transition-colors" />
-              <p className="text-zinc-400 font-mono text-sm mb-2">
-                DROP .XRK FILES HERE OR CONNECT USB
-              </p>
-              <p className="text-zinc-600 text-xs">
-                Supported formats: .xrk, .csv, .msl
-              </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".ibt,.ld"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <div
+              onClick={handleDropZoneClick}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer group ${
+                isDragOver
+                  ? 'border-cyan-400 bg-cyan-400/10'
+                  : selectedFile
+                  ? 'border-green-500/50 bg-green-500/5'
+                  : 'border-zinc-700 hover:border-cyan-400/50 hover:bg-cyan-400/5'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-12 h-12 text-cyan-400 mx-auto mb-4 animate-spin" />
+                  <p className="text-cyan-400 font-mono text-sm mb-2">
+                    PROCESSING FILE...
+                  </p>
+                  <p className="text-zinc-600 text-xs">
+                    Parsing telemetry data
+                  </p>
+                </>
+              ) : selectedFile ? (
+                <>
+                  <FileCheck className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                  <p className="text-green-400 font-mono text-sm mb-2">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-zinc-600 text-xs">
+                    Click to change file or drop a new one
+                  </p>
+                </>
+              ) : (
+                <>
+                  <HardDriveDownload className="w-12 h-12 text-zinc-600 mx-auto mb-4 group-hover:text-cyan-400 transition-colors" />
+                  <p className="text-zinc-400 font-mono text-sm mb-2">
+                    DROP .IBT OR .LD FILES HERE
+                  </p>
+                  <p className="text-zinc-600 text-xs">
+                    Supported formats: .ibt (iRacing), .ld (MoTeC)
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Circuit Selector */}
@@ -125,10 +234,18 @@ export function ConfigurationView({ onInitialize }: ConfigurationViewProps) {
 
             {/* Action Button */}
             <Button
-              onClick={onInitialize}
-              className="w-full h-14 bg-cyan-400 hover:bg-cyan-500 text-zinc-950 font-semibold text-sm uppercase tracking-wider"
+              onClick={handleInitialize}
+              disabled={loading || !selectedFile}
+              className="w-full h-14 bg-cyan-400 hover:bg-cyan-500 text-zinc-950 font-semibold text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Initialize Session Analysis
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </span>
+              ) : (
+                'Initialize Session Analysis'
+              )}
             </Button>
           </div>
 

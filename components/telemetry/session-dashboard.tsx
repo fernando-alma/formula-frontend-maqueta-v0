@@ -1,20 +1,9 @@
 "use client"
 
-import React from "react"
-
-import { Clock, Gauge, Activity, TrendingUp } from "lucide-react"
-
-// Mock lap data
-const lapData = [
-  { lap: 1, time: "1:35.234", s1: "32.456", s2: "28.122", s3: "34.656", best: false },
-  { lap: 2, time: "1:34.012", s1: "31.890", s2: "27.844", s3: "34.278", best: false },
-  { lap: 3, time: "1:33.567", s1: "31.456", s2: "27.556", s3: "34.555", best: false },
-  { lap: 4, time: "1:32.890", s1: "31.234", s2: "27.334", s3: "34.322", best: false },
-  { lap: 5, time: "1:32.450", s1: "30.890", s2: "27.112", s3: "34.448", best: true },
-  { lap: 6, time: "1:33.123", s1: "31.567", s2: "27.678", s3: "33.878", best: false },
-  { lap: 7, time: "1:32.789", s1: "31.123", s2: "27.222", s3: "34.444", best: false },
-  { lap: 8, time: "1:33.456", s1: "31.789", s2: "27.445", s3: "34.222", best: false },
-]
+import React, { useMemo } from "react"
+import { Clock, Gauge, Activity, TrendingUp, Loader2, AlertCircle } from "lucide-react"
+import { useTelemetryContext } from "@/context/TelemetryContext"
+import { formatLapTime, formatDistance } from "@/lib/utils/formatters"
 
 // Track SVG path (figure-8 style circuit)
 function TrackMap() {
@@ -22,12 +11,12 @@ function TrackMap() {
     <svg viewBox="0 0 400 300" className="w-full h-full">
       {/* Track outline */}
       <path
-        d="M 80 150 
-           C 80 80, 150 50, 200 50 
-           C 250 50, 320 80, 320 150 
-           C 320 180, 280 200, 250 200 
-           C 220 200, 200 220, 200 250 
-           C 200 280, 150 280, 120 250 
+        d="M 80 150
+           C 80 80, 150 50, 200 50
+           C 250 50, 320 80, 320 150
+           C 320 180, 280 200, 250 200
+           C 220 200, 200 220, 200 250
+           C 200 280, 150 280, 120 250
            C 90 220, 80 200, 80 150"
         fill="none"
         stroke="#3f3f46"
@@ -117,6 +106,75 @@ function KPICard({ label, value, unit, icon, highlight }: KPICardProps) {
 }
 
 export function SessionDashboard() {
+  const { session, loading, error } = useTelemetryContext()
+
+  // Calculate stats from session data
+  const stats = useMemo(() => {
+    if (!session || session.laps.length === 0) {
+      return {
+        bestLap: null,
+        bestLapTime: '--:--.---',
+        topSpeed: 0,
+        avgRPM: 0,
+        totalDistance: 0,
+        totalFuel: 0,
+      }
+    }
+
+    const bestLap = session.laps.reduce((best, lap) =>
+      lap.lap_time < best.lap_time ? lap : best
+    )
+
+    const topSpeed = Math.max(...session.laps.map(l => l.max_speed))
+    const avgRPM = session.laps.reduce((sum, l) => sum + l.avg_rpm, 0) / session.laps.length
+    const totalDistance = session.laps.reduce((sum, l) => sum + l.distance, 0)
+    const totalFuel = session.laps.reduce((sum, l) => sum + l.fuel_used, 0)
+
+    return {
+      bestLap,
+      bestLapTime: formatLapTime(bestLap.lap_time),
+      topSpeed: Math.round(topSpeed),
+      avgRPM: Math.round(avgRPM),
+      totalDistance,
+      totalFuel,
+    }
+  }, [session])
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="h-full bg-[#09090b] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-cyan-400 mx-auto mb-4 animate-spin" />
+          <p className="text-zinc-400">Loading session data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full bg-[#09090b] flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-400">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // No session state
+  if (!session) {
+    return (
+      <div className="h-full bg-[#09090b] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-zinc-400">No session loaded. Please upload a telemetry file.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full bg-[#09090b] p-4">
       {/* Top Bar */}
@@ -124,20 +182,24 @@ export function SessionDashboard() {
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2">
             <span className="text-zinc-500 text-xs uppercase">Driver</span>
-            <span className="text-white font-mono font-semibold">Lautaro (LAU)</span>
+            <span className="text-white font-mono font-semibold">{session.driver}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-zinc-500 text-xs uppercase">Car</span>
-            <span className="text-white font-mono">Fórmula 2.0 - Renault F4R</span>
+            <span className="text-white font-mono">{session.vehicle}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-zinc-500 text-xs uppercase">Session</span>
-            <span className="text-white font-mono">FP1 - 10:30 AM</span>
+            <span className="text-zinc-500 text-xs uppercase">Track</span>
+            <span className="text-white font-mono">{session.track}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-500 text-xs uppercase">Date</span>
+            <span className="text-white font-mono">{session.date}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-green-400 text-xs font-mono">LIVE</span>
+          <span className="text-green-400 text-xs font-mono">LOADED</span>
         </div>
       </div>
 
@@ -154,30 +216,35 @@ export function SessionDashboard() {
                 <tr className="text-zinc-500 text-xs uppercase">
                   <th className="px-3 py-2 text-left font-medium">Lap</th>
                   <th className="px-3 py-2 text-left font-medium">Time</th>
-                  <th className="px-3 py-2 text-left font-medium">S1</th>
-                  <th className="px-3 py-2 text-left font-medium">S2</th>
-                  <th className="px-3 py-2 text-left font-medium">S3</th>
+                  <th className="px-3 py-2 text-left font-medium">Max Speed</th>
+                  <th className="px-3 py-2 text-left font-medium">Avg RPM</th>
                 </tr>
               </thead>
               <tbody>
-                {lapData.map((lap) => (
-                  <tr
-                    key={lap.lap}
-                    className={`border-b border-zinc-800/50 ${
-                      lap.best ? 'bg-fuchsia-500/10' : 'hover:bg-zinc-800/30'
-                    }`}
-                  >
-                    <td className={`px-3 py-2 font-mono text-sm ${lap.best ? 'text-fuchsia-400' : 'text-white'}`}>
-                      {lap.lap}
-                    </td>
-                    <td className={`px-3 py-2 font-mono text-sm font-semibold ${lap.best ? 'text-fuchsia-400' : 'text-white'}`}>
-                      {lap.time}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-sm text-zinc-400">{lap.s1}</td>
-                    <td className="px-3 py-2 font-mono text-sm text-zinc-400">{lap.s2}</td>
-                    <td className="px-3 py-2 font-mono text-sm text-zinc-400">{lap.s3}</td>
-                  </tr>
-                ))}
+                {session.laps.map((lap) => {
+                  const isBest = stats.bestLap?.lap_number === lap.lap_number
+                  return (
+                    <tr
+                      key={lap.lap_number}
+                      className={`border-b border-zinc-800/50 ${
+                        isBest ? 'bg-fuchsia-500/10' : 'hover:bg-zinc-800/30'
+                      }`}
+                    >
+                      <td className={`px-3 py-2 font-mono text-sm ${isBest ? 'text-fuchsia-400' : 'text-white'}`}>
+                        {lap.lap_number}
+                      </td>
+                      <td className={`px-3 py-2 font-mono text-sm font-semibold ${isBest ? 'text-fuchsia-400' : 'text-white'}`}>
+                        {formatLapTime(lap.lap_time)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-sm text-zinc-400">
+                        {Math.round(lap.max_speed)} km/h
+                      </td>
+                      <td className="px-3 py-2 font-mono text-sm text-zinc-400">
+                        {Math.round(lap.avg_rpm).toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -211,47 +278,47 @@ export function SessionDashboard() {
         <div className="col-span-3 flex flex-col gap-4">
           <KPICard
             label="Best Lap"
-            value="1:32.450"
+            value={stats.bestLapTime}
             icon={<Clock className="w-4 h-4" />}
             highlight
           />
           <KPICard
             label="Top Speed"
-            value="242"
+            value={stats.topSpeed.toString()}
             unit="km/h"
             icon={<Gauge className="w-4 h-4" />}
           />
           <KPICard
             label="Avg RPM"
-            value="5,800"
+            value={stats.avgRPM.toLocaleString()}
             icon={<Activity className="w-4 h-4" />}
           />
           <KPICard
-            label="Gap to Reference"
-            value="+0.240"
-            unit="s"
+            label="Sample Rate"
+            value={session.sample_rate_hz.toString()}
+            unit="Hz"
             icon={<TrendingUp className="w-4 h-4" />}
           />
-          
+
           {/* Mini Stats */}
           <div className="bg-[#18181b] border border-zinc-800 rounded-lg p-4 flex-1">
             <h3 className="text-zinc-400 text-xs uppercase tracking-wider mb-3">Session Stats</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500 text-sm">Total Laps</span>
-                <span className="text-white font-mono font-semibold">8</span>
+                <span className="text-white font-mono font-semibold">{session.lap_count}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500 text-sm">Distance</span>
-                <span className="text-white font-mono font-semibold">32.4 km</span>
+                <span className="text-white font-mono font-semibold">{formatDistance(stats.totalDistance)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500 text-sm">Fuel Used</span>
-                <span className="text-white font-mono font-semibold">4.2 L</span>
+                <span className="text-white font-mono font-semibold">{stats.totalFuel.toFixed(1)} L</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-zinc-500 text-sm">Tire Deg</span>
-                <span className="text-yellow-400 font-mono font-semibold">12%</span>
+                <span className="text-zinc-500 text-sm">Session ID</span>
+                <span className="text-zinc-400 font-mono text-xs">{session.session_id.slice(0, 8)}...</span>
               </div>
             </div>
           </div>

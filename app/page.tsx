@@ -5,16 +5,27 @@ import { Settings, LayoutDashboard, Activity, Menu } from "lucide-react"
 import { ConfigurationView } from "@/components/telemetry/configuration-view"
 import { SessionDashboard } from "@/components/telemetry/session-dashboard"
 import { DeepEngineeringView } from "@/components/telemetry/deep-engineering-view"
+import { TelemetryProvider } from "@/context/TelemetryContext"
 
 type View = "config" | "dashboard" | "engineering"
 
-export default function TelemetryApp() {
+function TelemetryApp() {
   const [currentView, setCurrentView] = useState<View>("config")
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+
+  const handleInitialize = (newSessionId: string) => {
+    setSessionId(newSessionId)
+    setCurrentView("dashboard")
+  }
+
+  const handleGoToConfig = () => {
+    setCurrentView("config")
+  }
 
   // If we're on config view, show it full screen without sidebar
   if (currentView === "config") {
-    return <ConfigurationView onInitialize={() => setCurrentView("dashboard")} />
+    return <ConfigurationView onInitialize={handleInitialize} />
   }
 
   return (
@@ -41,7 +52,7 @@ export default function TelemetryApp() {
         {/* Nav Items */}
         <nav className="flex-1 p-3 space-y-1">
           <button
-            onClick={() => setCurrentView("config")}
+            onClick={handleGoToConfig}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
               currentView === "config"
                 ? "bg-cyan-400/10 text-cyan-400"
@@ -75,6 +86,14 @@ export default function TelemetryApp() {
           </button>
         </nav>
 
+        {/* Session Info */}
+        {sessionId && sidebarOpen && (
+          <div className="px-3 py-2 border-t border-zinc-800">
+            <p className="text-zinc-500 text-xs uppercase mb-1">Session</p>
+            <p className="text-zinc-400 text-xs font-mono truncate">{sessionId}</p>
+          </div>
+        )}
+
         {/* Toggle */}
         <div className="p-3 border-t border-zinc-800">
           <button
@@ -92,5 +111,13 @@ export default function TelemetryApp() {
         {currentView === "engineering" && <DeepEngineeringView />}
       </main>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <TelemetryProvider>
+      <TelemetryApp />
+    </TelemetryProvider>
   )
 }
