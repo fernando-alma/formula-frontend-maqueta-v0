@@ -43,7 +43,7 @@ function TelemetryApp() {
           </div>
           {sidebarOpen && (
             <div className="overflow-hidden">
-              <h1 className="text-white font-semibold text-sm truncate">NAVIX</h1>
+              <h1 className="text-white font-semibold text-sm truncate">FORMULA</h1>
               <p className="text-zinc-500 text-xs font-mono">v2.0</p>
             </div>
           )}
