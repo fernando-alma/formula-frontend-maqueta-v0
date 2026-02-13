@@ -1,6 +1,9 @@
 import type { Session, LapDetail } from "@/lib/types/telemetry";
 
-const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8000/api/v1/telemetry";
+const API_BASE = process.env.API_BASE_URL ?? "https://formula-backend-six.vercel.app/api/v1/telemetry";
+
+console.log("API_BASE_URL: ", process.env.API_BASE_URL);
+console.log("API_BASE: ", API_BASE);
 
 export class ApiError extends Error {
   constructor(
