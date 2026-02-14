@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
  * Usamos NEXT_PUBLIC_ para que la variable sea accesible desde el navegador.
  * Limpiamos la URL para evitar errores de doble barra (//) o rutas mal formadas.
  */
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "https://formula-backend-six.vercel.app";
 const API_BASE = `${BASE_URL}/api/v1/telemetry`;
 
 // Logs de auditoría en desarrollo para verificar qué está leyendo Vercel
