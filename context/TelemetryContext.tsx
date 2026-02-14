@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, ReactNode } from "react";
 import { useTelemetry } from "@/hooks/use-telemetry";
-import type { Session, LapDetail } from "@/lib/types/telemetry";
+import type { Session, LapDetail, SessionListItem } from "@/lib/types/telemetry";
 
 interface TelemetryContextValue {
   session: Session | null;
+  sessions: SessionListItem[];
   loading: boolean;
   error: string | null;
   uploadFile: (file: File) => Promise<Session | null>;
@@ -13,6 +14,7 @@ interface TelemetryContextValue {
   fetchLapDetail: (sessionId: string, lapNumber: number) => Promise<LapDetail | null>;
   clearError: () => void;
   clearSession: () => void;
+  loadSessions: () => Promise<void>;
 }
 
 const TelemetryContext = createContext<TelemetryContextValue | null>(null);

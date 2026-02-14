@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
-import type { Session, LapDetail } from "@/lib/types/telemetry";
+import type { Session, LapDetail, SessionListItem } from "@/lib/types/telemetry";
 import * as api from "@/lib/api/telemetry";
 
 export function useTelemetry() {
   const [session, setSession] = useState<Session | null>(null);
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,7 +12,7 @@ export function useTelemetry() {
     setLoading(true);
     setError(null);
     try {
-      const result = await api.uploadFile(file);
+      const result = await api.uploadFileViaStorage(file);
       setSession(result);
       return result;
     } catch (e) {
@@ -64,8 +65,18 @@ export function useTelemetry() {
     setSession(null);
   }, []);
 
+  const loadSessions = useCallback(async () => {
+    try {
+      const result = await api.fetchSessions();
+      setSessions(result);
+    } catch (e) {
+      console.error("Failed to load sessions:", e);
+    }
+  }, []);
+
   return {
     session,
+    sessions,
     loading,
     error,
     uploadFile,
@@ -73,5 +84,6 @@ export function useTelemetry() {
     fetchLapDetail,
     clearError,
     clearSession,
+    loadSessions,
   };
 }

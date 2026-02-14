@@ -39,3 +39,12 @@ export interface LapDetail {
   lap_time: number;
   points: TelemetryPoint[];
 }
+
+export interface SessionListItem {
+  session_id: string;
+  driver: string;
+  vehicle: string;
+  track: string;
+  date: string;
+  lap_count: number;
+}

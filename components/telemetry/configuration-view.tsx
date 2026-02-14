@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
-import { HardDriveDownload, CircleDot, Loader2, AlertCircle, FileCheck } from "lucide-react"
+import { useState, useCallback, useRef, useEffect } from "react"
+import { HardDriveDownload, CircleDot, Loader2, AlertCircle, FileCheck, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,10 +19,15 @@ interface ConfigurationViewProps {
 }
 
 export function ConfigurationView({ onInitialize }: ConfigurationViewProps) {
-  const { uploadFile, loading, error, clearError } = useTelemetryContext()
+  const { uploadFile, loading, error, clearError, sessions, loadSessions, fetchSession } = useTelemetryContext()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    loadSessions()
+  }, [loadSessions])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -74,6 +79,15 @@ export function ConfigurationView({ onInitialize }: ConfigurationViewProps) {
       onInitialize(session.session_id)
     }
   }, [selectedFile, uploadFile, onInitialize])
+
+  const handleLoadSession = useCallback(async (sessionId: string) => {
+    setLoadingSessionId(sessionId)
+    const session = await fetchSession(sessionId)
+    setLoadingSessionId(null)
+    if (session) {
+      onInitialize(session.session_id)
+    }
+  }, [fetchSession, onInitialize])
 
   return (
     <div className="min-h-screen bg-[#09090b] flex items-center justify-center p-8">
@@ -247,6 +261,42 @@ export function ConfigurationView({ onInitialize }: ConfigurationViewProps) {
                 'Initialize Session Analysis'
               )}
             </Button>
+
+            {/* Previous Sessions */}
+            {sessions.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-zinc-500" />
+                  <Label className="text-zinc-400 text-xs uppercase tracking-wider">
+                    Previous Sessions
+                  </Label>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {sessions.map((s) => (
+                    <button
+                      key={s.session_id}
+                      onClick={() => handleLoadSession(s.session_id)}
+                      disabled={loadingSessionId === s.session_id}
+                      className="w-full text-left bg-zinc-900 border border-zinc-800 rounded-lg p-3 hover:border-cyan-400/50 hover:bg-cyan-400/5 transition-colors disabled:opacity-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-white text-sm font-mono">
+                            {s.driver} — {s.track}
+                          </p>
+                          <p className="text-zinc-500 text-xs font-mono">
+                            {s.vehicle} · {s.date} · {s.lap_count} laps
+                          </p>
+                        </div>
+                        {loadingSessionId === s.session_id && (
+                          <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
